@@ -1,0 +1,22 @@
+services:
+  gluetun:
+    env_file: .env
+    image: docker.io/qmcgaw/gluetun:latest
+    container_name: protonvpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports: 
+      - 49893:49893 # This is for the qBittorrent WebUI Port
+      - 6881:6881 
+      - 6881:6881/udp 
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - OPENVPN_USER=${USER}
+      - OPENVPN_PASSWORD=${PASSWORD}
+      - VPN_PORT_FORWARDING=on
+      - SERVER_COUNTRIES=Netherlands,Germany
+    volumes:
+      - ./config:/gluetun
+    restart: unless-stopped

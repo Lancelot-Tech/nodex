@@ -1,0 +1,15 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    network_mode: 'host'
+    volumes:
+      - config:/config
+      - cache:/cache
+      - /media/loup/Films:/films
+      - /media/loup/Séries:/series
+    restart: 'unless-stopped'
+
+volumes:
+  config:
+  cache:
