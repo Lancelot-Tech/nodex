@@ -1,5 +1,7 @@
 services:
   gluetun:
+    networks:
+        - media-network
     env_file: .env
     image: docker.io/qmcgaw/gluetun:latest
     container_name: protonvpn
@@ -20,3 +22,7 @@ services:
     volumes:
       - ./config:/gluetun
     restart: unless-stopped
+
+networks:
+  media-network:
+    external: true

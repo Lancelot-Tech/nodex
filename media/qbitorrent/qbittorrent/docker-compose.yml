@@ -6,10 +6,13 @@ services:
       - PUID=1000 
       - PGID=1000 
       - TZ=Europe/Paris 
-      - WEBUI_PORT=49893 # This needs to be the exact same port we used on glueton for the WebUI
+      - WEBUI_PORT=49893 
       - TORRENTING_PORT=6881
     volumes:
-      - ./config:/config # this will create the config folder in the same folder as we have the yml file
-      - ${HOME}/${USER}/Téléchargements:/downloads 
+      - ./config:/config 
+      - /media/loup/Films:/films:rw
+      - /media/loup/Séries:/series:rw
+      - /home/loup/Documents:/downloads:rw
     network_mode: "container:protonvpn"
     restart: unless-stopped
+

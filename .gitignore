@@ -1,0 +1,4 @@
+.env
+servers.json
+/media/docker/appdata
+media/qbitorrent/qbitorrent/config/*
