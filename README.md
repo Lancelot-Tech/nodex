@@ -421,7 +421,7 @@ graph TD
     F -->|Search| H[Indexers]
     G -->|Protected by| I[ProtonVPN]
     F -->|Protected by| I
-    G -->|Save to| J[/films or /series]
+    G -->|Save to| J[Media Storage]
     B -->|Stream from| J
 ```
 
