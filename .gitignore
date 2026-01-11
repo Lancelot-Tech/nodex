@@ -1,4 +1,42 @@
+# Fichiers de configuration sensibles
 .env
+*.env
+!.env.example
+
+# Configuration ProtonVPN
 servers.json
-/media/docker/appdata
-media/qbitorrent/qbitorrent/config/*
+media/qbitorrent/protonvpn/config/*
+!media/qbitorrent/protonvpn/config/.gitkeep
+
+# Configuration qBittorrent
+media/qbitorrent/qbittorrent/config/*
+!media/qbitorrent/qbittorrent/config/.gitkeep
+
+# Données des applications
+/media/docker/appdata/*
+!media/docker/appdata/.gitkeep
+media/data/*
+!media/data/.gitkeep
+
+# Volumes Docker
+media/jellyfin/config/
+media/jellyfin/cache/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup
+*.bak
+*.backup

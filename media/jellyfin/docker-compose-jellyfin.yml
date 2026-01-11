@@ -6,8 +6,8 @@ services:
     volumes:
       - config:/config
       - cache:/cache
-      - /media/loup/Films:/films
-      - /media/loup/Séries:/series
+      - /media/${USER}/Films:/films
+      - /media/${USER}/Séries:/series
     restart: 'unless-stopped'
 
 volumes:

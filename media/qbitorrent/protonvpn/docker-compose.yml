@@ -10,9 +10,11 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     ports: 
-      - 49893:49893 # This is for the qBittorrent WebUI Port
+      - 49893:49893 # qBittorrent WebUI Port
       - 6881:6881 
-      - 6881:6881/udp 
+      - 6881:6881/udp
+      - 9696:9696 # Prowlarr WebUI Port
+      - 8191:8191 # FlareSolverr Port 
     environment:
       - VPN_SERVICE_PROVIDER=protonvpn
       - OPENVPN_USER=${USER}

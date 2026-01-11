@@ -17,7 +17,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/radarr:/config
       - ./data:/data
-      - /media/loup/Films:/films:rw
+      - /media/${USER}/Films:/films:rw
+      - ${HOME}/Documents:/downloads:rw
   sonarr:
     networks:
         - media-network
@@ -36,7 +37,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/sonarr:/config
       - ./data:/data
-      - /media/loup/Séries:/series:rw
+      - /media/${USER}/Séries:/series:rw
+      - ${HOME}/Documents:/downloads:rw
   bazarr:
     networks:
         - media-network
@@ -55,6 +57,26 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/bazarr:/config
       - ./data/media:/data/media:rw
+  whisparr:
+    networks:
+        - media-network
+    container_name: whisparr
+    image: ghcr.io/hotio/whisparr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    ports:
+      - 6969:6969
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/appdata/whisparr:/config
+      - ./data:/data
+      - /media/${USER}/Films:/films:rw
+      - ${HOME}/Documents:/downloads:rw
   sabnzbd:
     networks:
         - media-network
@@ -74,6 +96,63 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /docker/appdata/sabnzbd:/config
       - ./data/usenet:/data/usenet:rw
+  prowlarr:
+    container_name: prowlarr
+    image: ghcr.io/hotio/prowlarr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: "container:protonvpn"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/appdata/prowlarr:/config
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: "container:protonvpn"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/Berlin
+  homepage:
+    networks:
+        - media-network
+    container_name: homepage
+    image: ghcr.io/gethomepage/homepage:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    ports:
+      - 3000:3000
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - HOMEPAGE_ALLOWED_HOSTS=192.168.1.17:3000,192.168.1.17,localhost:3000,localhost,127.0.0.1:3000,127.0.0.1
+    volumes:
+      - ./docker/appdata/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  portainer:
+    networks:
+        - media-network
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    ports:
+      - 9000:9000
+      - 9443:9443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+
+volumes:
+  portainer_data:
 
 networks:
   media-network:

@@ -10,9 +10,9 @@ services:
       - TORRENTING_PORT=6881
     volumes:
       - ./config:/config 
-      - /media/loup/Films:/films:rw
-      - /media/loup/Séries:/series:rw
-      - /home/loup/Documents:/downloads:rw
+      - /media/${USER}/Films:/films:rw
+      - /media/${USER}/Séries:/series:rw
+      - ${HOME}/Documents:/downloads:rw
     network_mode: "container:protonvpn"
     restart: unless-stopped
 
