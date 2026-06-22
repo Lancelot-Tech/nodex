@@ -78,9 +78,9 @@ check_prerequisites() {
     fi
     
     # Check .env file for ProtonVPN
-    if [ ! -f "qbitorrent/protonvpn/.env" ]; then
+    if [ ! -f "vpn-stack/protonvpn/.env" ]; then
         print_warning "Missing .env file for ProtonVPN"
-        print_info "Copy .env.example to qbitorrent/protonvpn/.env and configure your credentials"
+        print_info "Copy .env.example to vpn-stack/protonvpn/.env and configure your credentials"
     fi
     
     echo ""
@@ -92,108 +92,40 @@ check_prerequisites() {
 
 start_all() {
     print_header "Starting All Services"
-    
-    # Start ProtonVPN first (required for qBittorrent)
-    print_info "Starting ProtonVPN..."
-    cd qbitorrent/protonvpn
+
+    # Single compose project (media/docker-compose.yml uses "include:" to pull
+    # in protonvpn, qbittorrent and jellyfin). Startup order and health gating
+    # (protonvpn -> qbittorrent -> flaresolverr -> prowlarr -> everything else)
+    # are enforced natively via depends_on/healthcheck, not by sleeps here.
+    print_info "Starting full stack (docker compose up -d)..."
     docker compose up -d
-    cd ../..
-    print_success "ProtonVPN started"
-    
-    # Wait for VPN to connect
-    print_info "Waiting for VPN connection (10 seconds)..."
-    sleep 10
-    
-    # Start qBittorrent
-    print_info "Starting qBittorrent..."
-    cd qbitorrent/qbittorrent
-    docker compose up -d
-    cd ../..
-    print_success "qBittorrent started"
-    
-    # Start Jellyfin
-    print_info "Starting Jellyfin..."
-    cd jellyfin
-    docker compose -f docker-compose-jellyfin.yml up -d
-    cd ..
-    print_success "Jellyfin started"
-    
-    # Start main services (Radarr, Sonarr, Bazarr, Sabnzbd, Prowlarr, FlareSolverr, Homepage, Whisparr, Portainer)
-    print_info "Starting media services (Radarr, Sonarr, Bazarr, Sabnzbd, Prowlarr, FlareSolverr, Homepage, Whisparr, Portainer)..."
-    docker compose up -d
-    print_success "Media services started"
-    
-    echo ""
     print_success "All services are started!"
+
+    echo ""
     show_urls
 }
 
 stop_all() {
     print_header "Stopping All Services"
-    
-    # Stop in reverse order
+
     docker compose down
-    cd jellyfin && docker compose -f docker-compose-jellyfin.yml down && cd ..
-    cd qbitorrent/qbittorrent && docker compose down && cd ../..
-    cd qbitorrent/protonvpn && docker compose down && cd ../..
-    
+
     print_success "All services are stopped"
     echo ""
 }
 
 restart_all() {
-    print_header "Restarting All Services (Safe Mode)"
-    
+    print_header "Restarting All Services"
+
     print_info "Stopping services..."
-    # Stop services in reverse order
     docker compose down
-    cd jellyfin && docker compose -f docker-compose-jellyfin.yml down && cd ..
-    cd qbitorrent/qbittorrent && docker compose down && cd ../..
-    cd qbitorrent/protonvpn && docker compose down && cd ../..
-    
     print_success "All services stopped"
     echo ""
-    
-    print_info "Waiting 3 seconds..."
-    sleep 3
-    
-    # Start ProtonVPN first
-    print_info "Starting ProtonVPN..."
-    cd qbitorrent/protonvpn
-    docker compose up -d
-    cd ../..
-    print_success "ProtonVPN started"
-    
-    # Wait for VPN to be ready
-    print_info "Waiting for VPN connection (15 seconds)..."
-    sleep 15
-    
-    # Verify VPN is up
-    if ! docker ps | grep -q protonvpn; then
-        print_error "ProtonVPN failed to start!"
-        return 1
-    fi
-    print_success "VPN is running"
-    
-    # Start VPN-dependent services
-    print_info "Starting VPN-dependent services (qBittorrent, Prowlarr, FlareSolverr)..."
-    cd qbitorrent/qbittorrent
-    docker compose up -d
-    cd ../..
-    print_success "qBittorrent started"
-    
-    # Start Jellyfin
-    print_info "Starting Jellyfin..."
-    cd jellyfin
-    docker compose -f docker-compose-jellyfin.yml up -d
-    cd ..
-    print_success "Jellyfin started"
-    
-    # Start remaining services (includes Prowlarr and FlareSolverr)
-    print_info "Starting remaining services..."
+
+    print_info "Starting services..."
     docker compose up -d
     print_success "All services started"
-    
+
     echo ""
     print_success "Restart completed successfully!"
     echo ""
@@ -207,26 +139,17 @@ restart_service() {
     
     case $service in
         vpn|protonvpn)
-            cd qbitorrent/protonvpn
-            docker compose restart
-            cd ../..
+            docker compose restart protonvpn
             ;;
         qbittorrent|qbit)
-            cd qbitorrent/qbittorrent
-            docker compose restart
-            cd ../..
+            docker compose restart qbittorrent
             ;;
-        jellyfin)
-            cd jellyfin
-            docker compose -f docker-compose-jellyfin.yml restart
-            cd ..
-            ;;
-        radarr|sonarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr|portainer)
+        jellyfin|radarr|sonarr|lidarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr|portainer)
             docker compose restart $service
             ;;
         *)
             print_error "Unknown service: $service"
-            print_info "Available services: vpn, qbittorrent, jellyfin, radarr, sonarr, bazarr, sabnzbd, prowlarr, flaresolverr, homepage, whisparr, portainer"
+            print_info "Available services: vpn, qbittorrent, jellyfin, radarr, sonarr, lidarr, bazarr, sabnzbd, prowlarr, flaresolverr, homepage, whisparr, portainer"
             return 1
             ;;
     esac
@@ -244,8 +167,9 @@ show_status() {
     
     echo -e "\n${YELLOW}Docker Containers:${NC}"
     docker ps -a --filter "name=protonvpn" --filter "name=qbittorrent" --filter "name=jellyfin" \
-        --filter "name=radarr" --filter "name=sonarr" --filter "name=bazarr" --filter "name=sabnzbd" \
+        --filter "name=radarr" --filter "name=sonarr" --filter "name=lidarr" --filter "name=bazarr" --filter "name=sabnzbd" \
         --filter "name=prowlarr" --filter "name=flaresolverr" --filter "name=homepage" --filter "name=whisparr" \
+        --filter "name=portainer" \
         --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     
     echo ""
@@ -264,10 +188,7 @@ show_logs() {
         qbittorrent|qbit)
             docker logs --tail $lines qbittorrent
             ;;
-        jellyfin)
-            docker logs --tail $lines jellyfin
-            ;;
-        radarr|sonarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr)
+        jellyfin|radarr|sonarr|lidarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr|portainer)
             docker logs --tail $lines $service
             ;;
         *)
@@ -289,10 +210,7 @@ follow_logs() {
         qbittorrent|qbit)
             docker logs -f qbittorrent
             ;;
-        jellyfin)
-            docker logs -f jellyfin
-            ;;
-        radarr|sonarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr)
+        jellyfin|radarr|sonarr|lidarr|bazarr|sabnzbd|prowlarr|flaresolverr|homepage|whisparr|portainer)
             docker logs -f $service
             ;;
         *)
@@ -337,6 +255,7 @@ show_urls() {
     echo -e "${GREEN}Prowlarr:${NC}        http://$ip:9696"
     echo -e "${GREEN}Radarr:${NC}          http://$ip:7878"
     echo -e "${GREEN}Sonarr:${NC}          http://$ip:8989"
+    echo -e "${GREEN}Lidarr:${NC}          http://$ip:8686"
     echo -e "${GREEN}Whisparr:${NC}        http://$ip:6969"
     echo -e "${GREEN}Bazarr:${NC}          http://$ip:6767"
     echo -e "${GREEN}Sabnzbd:${NC}         http://$ip:8080"
@@ -355,7 +274,7 @@ diagnostic() {
     check_vpn
     
     print_header "Disk Space Usage"
-    df -h /media/$USER 2>/dev/null || df -h $HOME 2>/dev/null || print_warning "Unable to check disk space"
+    df -h /srv/media 2>/dev/null || df -h $HOME 2>/dev/null || print_warning "Unable to check disk space"
     
     echo ""
 }
@@ -371,9 +290,6 @@ update_all() {
     stop_all
     
     print_info "Downloading new images..."
-    cd qbitorrent/protonvpn && docker compose pull && cd ../..
-    cd qbitorrent/qbittorrent && docker compose pull && cd ../..
-    cd jellyfin && docker compose -f docker-compose-jellyfin.yml pull && cd ..
     docker compose pull
     
     print_info "Restarting services with new images..."
@@ -400,8 +316,8 @@ show_help() {
     echo -e "    ${GREEN}restart${NC}            Restart all services (safe, respects VPN dependencies)"
     echo -e "    ${GREEN}restart-service${NC}    Restart a specific service"
     echo -e "                         Usage: $0 restart-service <service>"
-    echo -e "                         Services: vpn, qbittorrent, jellyfin, radarr, sonarr, bazarr, sabnzbd,"
-    echo -e "                                   prowlarr, flaresolverr, homepage, whisparr, portainer"
+    echo -e "                         Services: vpn, qbittorrent, jellyfin, radarr, sonarr, lidarr, bazarr,"
+    echo -e "                                   sabnzbd, prowlarr, flaresolverr, homepage, whisparr, portainer"
     echo ""
     echo -e "    ${GREEN}status${NC}             Show service status"
     echo -e "    ${GREEN}urls${NC}               Show service access URLs"

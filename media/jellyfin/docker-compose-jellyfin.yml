@@ -3,12 +3,22 @@ services:
     image: jellyfin/jellyfin
     container_name: jellyfin
     network_mode: 'host'
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/dri/card1:/dev/dri/card1
+    group_add:
+      - "44"
+      - "990"
     volumes:
       - config:/config
       - cache:/cache
-      - /media/${USER}/Films:/films
-      - /media/${USER}/Séries:/series
+      - ${MEDIA_FILMS_PATH}:/films
+      - ${MEDIA_SERIES_PATH}:/series
+      - ${MEDIA_MUSIC_PATH}:/music
     restart: 'unless-stopped'
+    depends_on:
+      prowlarr:
+        condition: service_started
 
 volumes:
   config:

@@ -1,173 +1,80 @@
-# 🤖 Configuration Automation Guide
+# Automation Overview
 
-This guide explains what can and cannot be automated in the media server setup.
+This project automates essentially the entire setup — system packages, storage, the Docker stack, and the per-service configuration (root folders, renaming, download clients, indexer proxy, app sync) that used to require clicking through every web UI by hand.
 
-## ⚙️ What CAN Be Automated
+## What's automated
 
-### ✅ System Setup
-- ✅ Docker installation
-- ✅ OpenSSH installation  
-- ✅ NoMachine installation
-- ✅ System dependencies
+### `scripts/install.sh` — system and stack bootstrap
 
-**Script**: `./scripts/system-setup.sh`
+- Docker, Docker Compose plugin, OpenSSH server, system utilities
+- Tailscale installation and mandatory login
+- inotify limits for Docker
+- Permanent `/etc/fstab` mount points for Films, Series, Music (independent from desktop auto-mount, which is what caused the old "Films1 / Series1" duplicate-mount issue)
+- Shared configuration (`media/.env`: PUID/PGID, timezone, Docker group GID, storage paths)
+- ProtonVPN credentials
+- The `media-network` Docker network
+- A `systemd` unit (`media-server.service`) that brings the stack up automatically, in the right order, on every boot
+- The first `docker compose up -d`, with health-check waiting
 
-### ✅ Docker Services
-- ✅ Starting/stopping all services
-- ✅ Updating Docker images
-- ✅ Network creation
-- ✅ Volume mounting
+Idempotent: every step checks current state first and skips what's already done. Safe to re-run after a config change or a partial failure.
 
-**Script**: `./media-server.sh`
+### `scripts/configure-services.sh` — application configuration via REST APIs
 
-## ❌ What CANNOT Be Easily Automated
+Once the stack is running, this script talks directly to the REST APIs exposed by Radarr, Sonarr, Lidarr, Whisparr, qBittorrent and Prowlarr — the same APIs their own web UIs use — to apply the configuration described in [CONFIGURATION.md](CONFIGURATION.md):
 
-### Configuration via Web UI (Manual Required)
+- qBittorrent: download paths, "use category paths in manual mode", per-app categories
+- Radarr/Sonarr/Lidarr/Whisparr: root folder, file renaming, qBittorrent as download client
+- Prowlarr: FlareSolverr indexer proxy (tagged `flaresolverr`), full sync to all four *arr apps
 
-The following services require **initial configuration through their web interfaces**:
+It authenticates against each app using the API key already present in its `config.xml` (generated automatically on first boot — no manual step needed to obtain it), and against qBittorrent using the WebUI credentials you provide when the script runs. Like `install.sh`, it's idempotent: it reads current state via `GET` before writing anything via `POST`/`PUT`, so re-running it after you tweak a setting in the UI won't fight you — it just reconciles drift.
 
-#### 1. **Prowlarr** - Indexer Configuration
-- Adding indexers (1337x, YGGtorrent, etc.)
-- Configuring FlareSolverr
-- Connecting to Radarr/Sonarr/Whisparr
-- Setting up tags
+Implementation: `scripts/lib/arr_api.sh` (Radarr/Sonarr/Lidarr/Whisparr/Prowlarr REST helpers) and `scripts/lib/qbt_api.sh` (qBittorrent WebUI API helpers).
 
-**Why**: Indexers require manual selection, credentials, and testing
+### `media-server.sh` — day-to-day operations
 
-#### 2. **Radarr/Sonarr/Whisparr** - Media Management
-- Adding download clients (qBittorrent)
-- Configuring quality profiles
-- Setting naming formats
-- Retrieving API keys
+Starting, stopping, restarting, checking status, tailing logs, and updating images. See [README.md](README.md#management).
 
-**Why**: Requires interactive UI decisions and preferences
+## What's still manual, and why
 
-#### 3. **Jellyfin** - Media Server
-- Initial user setup
-- Library configuration
-- Metadata providers
-- Transcoding settings
+| Task | Why it isn't scripted |
+|------|------------------------|
+| Adding indexers in Prowlarr | Requires personal choice of trackers and, for private trackers, an external account/credentials |
+| Tagging Cloudflare-protected indexers with `flaresolverr` | Tied to which indexers you add above |
+| Jellyfin libraries and hardware-acceleration toggle | One-time interactive setup; the GPU device passthrough itself is already in `media/jellyfin/docker-compose-jellyfin.yml` |
+| Homepage per-service stat widgets | Optional, cosmetic, and needs you to choose which stats matter to you |
+| Quality profiles, indexer scoring, custom formats | Personal preference, not configuration with a single "correct" value to set |
 
-**Why**: Requires user preferences and media scanning
+These either need an external account, a personal judgment call, or genuinely interactive UI flow (a quality-profile editor, for instance) — there's no API call that substitutes for "decide what you want."
 
-#### 4. **qBittorrent** - Torrent Client
-- Changing default password
-- Category configuration
-- Download paths
+## Configuration backup
 
-**Why**: Security and personal preferences
-
-## 🔧 Semi-Automated Options
-
-### Using APIs (Advanced)
-
-You can automate some configuration using the *arr APIs, but this requires:
-
-1. **Initial manual setup** to get API keys
-2. **Custom scripts** to interact with APIs
-3. **Maintenance** when APIs change
-
-Example using curl to add an indexer to Prowlarr:
+The configuration `configure-services.sh` writes lives in `media/docker/appdata/<service>/`. To snapshot it:
 
 ```bash
-API_KEY="your_prowlarr_api_key"
-URL="http://192.168.1.17:9696"
-
-curl -X POST "$URL/api/v1/indexer" \
-  -H "X-Api-Key: $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "1337x",
-    "protocol": "torrent",
-    "priority": 25,
-    "enable": true,
-    "tags": [1],
-    "fields": [...]
-  }'
-```
-
-**Complexity**: High - requires understanding of each service's API structure
-
-### Configuration Backup/Restore
-
-A more practical approach is to **backup configurations after initial setup**:
-
-```bash
-# Backup all configurations
-tar -czf media-server-config-$(date +%Y%m%d).tar.gz \
-  media/docker/appdata/prowlarr/config.xml \
-  media/docker/appdata/radarr/config.xml \
-  media/docker/appdata/sonarr/config.xml \
-  media/docker/appdata/whisparr/config.xml \
-  media/qbitorrent/qbittorrent/config/qBittorrent/qBittorrent.conf
-
-# Restore configurations
-tar -xzf media-server-config-YYYYMMDD.tar.gz
-```
-
-## 📝 Recommended Workflow
-
-### First Installation (Manual)
-1. Run `./scripts/system-setup.sh` ✅ Automated
-2. Run `./media-server.sh start` ✅ Automated  
-3. Configure each service via web UI ❌ Manual
-4. Test everything works
-5. **Backup configurations** ✅ Can be scripted
-
-### After System Reinstall
-1. Run `./scripts/system-setup.sh` ✅ Automated
-2. **Restore configuration backup** ✅ Automated
-3. Run `./media-server.sh start` ✅ Automated
-4. Verify services ❌ Manual check
-
-## 🎯 Best Practice: Configuration as Code
-
-While you can't fully automate the initial setup, you can:
-
-1. **Document your settings** in [CONFIGURATION.md](CONFIGURATION.md)
-2. **Take screenshots** of important configurations
-3. **Export/backup** configurations after setup
-4. **Script the restoration** of backed up configs
-
-### Example Backup Script
-
-Create `scripts/backup-configs.sh`:
-
-```bash
-#!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="backups"
-BACKUP_FILE="$BACKUP_DIR/media-server-config-$DATE.tar.gz"
-
-mkdir -p $BACKUP_DIR
-
-tar -czf $BACKUP_FILE \
+mkdir -p backups
+tar -czf "backups/media-server-config-$DATE.tar.gz" \
   media/docker/appdata/prowlarr/ \
   media/docker/appdata/radarr/ \
   media/docker/appdata/sonarr/ \
+  media/docker/appdata/lidarr/ \
   media/docker/appdata/whisparr/ \
   media/docker/appdata/bazarr/ \
-  media/qbitorrent/qbittorrent/config/ \
-  --exclude='*/logs/*' \
-  --exclude='*/cache/*'
-
-echo "Backup created: $BACKUP_FILE"
+  media/vpn-stack/qbittorrent/config/ \
+  --exclude='*/logs/*' --exclude='*/cache/*'
 ```
 
-## 💡 Summary
+Restore with `tar -xzf <archive>` from the repo root, then `./media-server.sh restart`.
 
-| Task | Automated? | Tool |
-|------|-----------|------|
-| System installation | ✅ Yes | `system-setup.sh` |
-| Docker services | ✅ Yes | `media-server.sh` |
-| Network setup | ✅ Yes | `media-server.sh` |
-| Initial web UI config | ❌ No | Manual |
-| API keys retrieval | ❌ No | Manual |
-| Configuration backup | ✅ Yes | Custom script |
-| Configuration restore | ✅ Yes | tar/rsync |
+## Recommended workflow
 
-**Bottom line**: Initial configuration requires ~30-60 minutes of manual work, but you can backup everything and restore it in seconds on a fresh install.
+**First installation**
+1. `./scripts/install.sh` — system, storage, Tailscale, Docker stack
+2. `./scripts/configure-services.sh` — root folders, renaming, qBittorrent, Prowlarr sync
+3. Add indexers in Prowlarr, tag the Cloudflare-protected ones, set up Jellyfin libraries
+4. Back up configuration
 
----
-
-**Tip**: After your first complete setup, run a backup script and commit the configuration structure (without sensitive data) to your repository for reference.
+**After a reinstall**
+1. `./scripts/install.sh` — idempotent, skips what's already configured
+2. Restore the configuration backup, or re-run `./scripts/configure-services.sh` if starting from scratch
+3. Verify services are healthy: `./media-server.sh status`

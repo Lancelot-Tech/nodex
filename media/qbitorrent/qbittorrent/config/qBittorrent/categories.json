@@ -1,8 +1,0 @@
-{
-    "radarr": {
-        "save_path": "/downloads/radarr"
-    },
-    "sonarr": {
-        "save_path": "/downloads/sonarr"
-    }
-}

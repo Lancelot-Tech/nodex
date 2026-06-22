@@ -13,11 +13,11 @@ OpenVPN/IKEv2
 
 - Create the necessary folders:
 ```bash
-mkdir -p "$HOME/Documents/unetflix/media/qbitorrent/protonvpn" && mkdir -p "$HOME/Documents/unetflix/media/qbitorrent/qbittorrent/config"
+mkdir -p "$HOME/Documents/netflix/media/vpn-stack/protonvpn" && mkdir -p "$HOME/Documents/netflix/media/vpn-stack/qbittorrent/config"
 ```
 - Use cat to quickly fill in the info for the gluetun yml file:
 ```bash
-cat <<EOF > "$HOME/Documents/unetflix/media/qbitorrent/protonvpn/docker-compose.yml"
+cat <<EOF > "$HOME/Documents/netflix/media/vpn-stack/protonvpn/docker-compose.yml"
 services:
   gluetun:
     image: docker.io/qmcgaw/gluetun:latest
@@ -43,7 +43,7 @@ EOF
 ```
 
 ```bash
-cat <<EOF > "$HOME/Documents/unetflix/media/qbitorrent/qbittorrent/docker-compose.yml"
+cat <<EOF > "$HOME/Documents/netflix/media/vpn-stack/qbittorrent/docker-compose.yml"
 services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
@@ -66,17 +66,17 @@ EOF
 
 ```bash
 curl -s https://api.github.com/repos/VueTorrent/VueTorrent/releases/latest | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url' | xargs -I{} sh -c 'curl -L -o /tmp/vuetorrent.zip {}
-unzip -o /tmp/vuetorrent.zip -d $HOME/Documents/unetflix/media/qbitorrent/qbittorrent/config
+unzip -o /tmp/vuetorrent.zip -d $HOME/Documents/netflix/media/vpn-stack/qbittorrent/config
 rm /tmp/vuetorrent.zip'
 ```
 - Start the qbittorrent container:
 
 ```bash
-docker compose -f "$HOME/Documents/unetflix/media/qbitorrent/protonvpn/docker-compose.yml" up -d
+docker compose -f "$HOME/Documents/netflix/media/vpn-stack/protonvpn/docker-compose.yml" up -d
 ```
 
 ```bash
-docker compose -f "$HOME/Documents/unetflix/media/qbitorrent/qbittorrent/docker-compose.yml" up -d
+docker compose -f "$HOME/Documents/netflix/media/vpn-stack/qbittorrent/docker-compose.yml" up -d
 ```
 
 - Get qbittorrent credentials with:

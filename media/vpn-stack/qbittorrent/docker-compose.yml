@@ -1,0 +1,28 @@
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Paris 
+      - WEBUI_PORT=49893 
+      - TORRENTING_PORT=6881
+    volumes:
+      - ./config:/config
+      - ${MEDIA_FILMS_PATH}:/films:rw
+      - ${MEDIA_SERIES_PATH}:/series:rw
+      - ${MEDIA_MUSIC_PATH}:/music:rw
+      - ${HOME}/Documents:/downloads:rw
+    network_mode: "container:protonvpn"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:49893"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      protonvpn:
+        condition: service_healthy
+

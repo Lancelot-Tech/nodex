@@ -1,5 +1,5 @@
 services:
-  gluetun:
+  protonvpn:
     networks:
         - media-network
     env_file: .env
@@ -24,6 +24,12 @@ services:
     volumes:
       - ./config:/gluetun
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
 networks:
   media-network:

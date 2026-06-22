@@ -5,12 +5,12 @@
 
 # Configuration ProtonVPN
 servers.json
-media/qbitorrent/protonvpn/config/*
-!media/qbitorrent/protonvpn/config/.gitkeep
+media/vpn-stack/protonvpn/config/*
+!media/vpn-stack/protonvpn/config/.gitkeep
 
 # Configuration qBittorrent
-media/qbitorrent/qbittorrent/config/*
-!media/qbitorrent/qbittorrent/config/.gitkeep
+media/vpn-stack/qbittorrent/config/*
+!media/vpn-stack/qbittorrent/config/.gitkeep
 
 # Données des applications
 /media/docker/appdata/*

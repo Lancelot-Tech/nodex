@@ -1,3 +1,8 @@
+include:
+  - vpn-stack/protonvpn/docker-compose.yml
+  - vpn-stack/qbittorrent/docker-compose.yml
+  - jellyfin/docker-compose-jellyfin.yml
+
 services:
   radarr:
     networks:
@@ -17,8 +22,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/radarr:/config
       - ./data:/data
-      - /media/${USER}/Films:/films:rw
+      - ${MEDIA_FILMS_PATH}:/films:rw
       - ${HOME}/Documents:/downloads:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
   sonarr:
     networks:
         - media-network
@@ -37,8 +45,34 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/sonarr:/config
       - ./data:/data
-      - /media/${USER}/Séries:/series:rw
+      - ${MEDIA_SERIES_PATH}:/series:rw
       - ${HOME}/Documents:/downloads:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
+  lidarr:
+    networks:
+        - media-network
+    container_name: lidarr
+    image: ghcr.io/hotio/lidarr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    ports:
+      - 8686:8686
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/appdata/lidarr:/config
+      - ./data:/data
+      - ${MEDIA_MUSIC_PATH}:/music:rw
+      - ${HOME}/Documents:/downloads:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
   bazarr:
     networks:
         - media-network
@@ -57,6 +91,9 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/bazarr:/config
       - ./data/media:/data/media:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
   whisparr:
     networks:
         - media-network
@@ -75,8 +112,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/whisparr:/config
       - ./data:/data
-      - /media/${USER}/Films:/films:rw
+      - ${MEDIA_FILMS_PATH}:/films:rw
       - ${HOME}/Documents:/downloads:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
   sabnzbd:
     networks:
         - media-network
@@ -96,6 +136,9 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /docker/appdata/sabnzbd:/config
       - ./data/usenet:/data/usenet:rw
+    depends_on:
+      prowlarr:
+        condition: service_started
   prowlarr:
     container_name: prowlarr
     image: ghcr.io/hotio/prowlarr:latest
@@ -110,6 +153,17 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/appdata/prowlarr:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      protonvpn:
+        condition: service_healthy
+      flaresolverr:
+        condition: service_started
   flaresolverr:
     container_name: flaresolverr
     image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -120,6 +174,15 @@ services:
     environment:
       - LOG_LEVEL=info
       - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8191/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      protonvpn:
+        condition: service_healthy
   homepage:
     networks:
         - media-network
@@ -134,10 +197,15 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Berlin
-      - HOMEPAGE_ALLOWED_HOSTS=192.168.1.17:3000,192.168.1.17,localhost:3000,localhost,127.0.0.1:3000,127.0.0.1
+      - HOMEPAGE_ALLOWED_HOSTS=*
+    group_add:
+      - "${DOCKER_GID}"
     volumes:
       - ./docker/appdata/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      prowlarr:
+        condition: service_started
   portainer:
     networks:
         - media-network
@@ -150,6 +218,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - portainer_data:/data
+    depends_on:
+      prowlarr:
+        condition: service_started
 
 volumes:
   portainer_data:
