@@ -1,6 +1,6 @@
 <div align="center">
 
-# Homemade Netflix Media Server
+# Homemade Media Server
 
 **A self-hosted media server stack with VPN-protected downloads**
 
